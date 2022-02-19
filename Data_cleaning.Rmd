@@ -1,0 +1,69 @@
+---
+title: "Project2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+library(dplyr)
+#Read the file for health data
+health_data = "~/Desktop/statistics.pdf/STA-310/2020 County Health Rankings Data - v2.xlsx"
+excel_sheets(path = health_data)
+Ranked_measured_Data <- read_excel(path = health_data, sheet = "Ranked Measure Data", skip = 1)
+View(Ranked_measured_Data)
+colnames(Ranked_measured_Data)
+
+#Create the table with our chosen explanatory variables
+data_keep = Ranked_measured_Data[, c(1, 2, 3, 24, 28, 32, 37, 56, 60, 64, 66, 70, 72, 85, 111, 115, 119, 153, 166, 175, 178, 204, 217, 237)] 
+colnames(data_keep)
+
+#The same thing for additional measured data
+Additional_measured_data <- read_excel(path = health_data, sheet = "Additional Measure Data", skip = 1)
+View(Additional_measured_data)
+colnames(Additional_measured_data)
+data_keep2 = Additional_measured_data[, c(2, 3, 4, 23, 42, 61, 91, 93, 95, 132, 136, 158, 198, 246, 249)] 
+
+# View(data_keep)
+# View(data_keep2)
+#Combine the two data
+totalData <- merge(data_keep, data_keep2,by=c("State","County"))
+
+#In order to create population density, read the table for land area
+library(readr)
+land_data = read_csv("~/Desktop/statistics.pdf/STA-310/dexter_2129905758_extract.csv", skip = 1)
+#Keep the total area and FIPS
+land = land_data[, c(6, 18)]
+
+#Merge into the totalData and create population density and WorkersDriveAloneLong
+totalData = merge(totalData, land, by.x = "FIPS", by.y = "County FIPS", all.x = TRUE)
+
+#Create population density
+totalData$`Total area (square miles)` = as.numeric(totalData$`Total area (square miles)`)
+#Divide the population by area and create a new population density variable
+totalData$populationDensity = totalData$Population / totalData$`Total area (square miles)`
+
+View(totalData)
+colnames(totalData)
+
+#Create a number of mental health providers per 100,000 people
+library(tidyverse)
+totalData = totalData %>%
+    separate(`Mental Health Provider Ratio`, c("MentalHealthProvidorratioLeft", "MentalHealthProvidorratioRight"), sep=":")
+totalData$MentalHealthProvidorratioLeft = as.numeric(unlist(totalData$MentalHealthProvidorratioLeft))
+totalData$MentalHealthProvidorratioRight = as.numeric(unlist(totalData$MentalHealthProvidorratioRight))
+Right = totalData$MentalHealthProvidorratioRight
+Left = totalData$MentalHealthProvidorratioLeft
+Right[is.na(Right)] = 0
+Left[is.na(Left)] = 1
+totalData$MentalHealthProviderRate = (Right / Left) * 100000
+colnames(totalData)
+
+finalData = select(totalData, -17, -18)
+
+write.csv(finalData, "CSC324_project_data.csv")
+```
+
