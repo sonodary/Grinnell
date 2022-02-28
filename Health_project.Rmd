@@ -1,0 +1,365 @@
+---
+title: "Project_Health"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(maps)
+library(mapproj)
+library(shiny)
+library(leaflet)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(ggiraph)
+
+
+Health_Data = read_csv("~/Desktop/CS/CSC324_individual/CSC324_project_data.csv")
+# The first column is not needed
+health_data = dplyr::select(Health_Data, -1)
+health_data_plot = dplyr::select(health_data, -1, -2, -3)
+health_data_plot = dplyr::select(health_data_plot, 3, 5, 6, 7, 11, 15, 16)
+health_data_plot[] <- lapply(health_data_plot, function(x) as.numeric(as.character(x)))
+health_data_plot[complete.cases(health_data_plot), ]
+#View(health_data_plot)
+
+#Create the list of variable names to use for selectInput
+var_names = colnames(health_data)
+var_names = var_names[-c(1, 2, 3)]
+var_names = sort(var_names)
+
+var_names2 = colnames(health_data_plot)
+
+county_map = map_data("county")
+county_map
+
+
+health_data$County = tolower(health_data$County)
+county_map$County = county_map$subregion
+
+# View(county_map)
+# View(health_data)
+
+county_map = inner_join(county_map, health_data, by = "County")
+
+# # Call this function to create a map
+# map_func <- function(health_data, county_map, variable){
+#   
+#   # set the UI of the map
+#   map_ui <- function () { 
+#     theme_bw() + theme(axis.title = element_blank(),
+#                        axis.text = element_blank(),
+#                        axis.ticks = element_blank(),
+#                        panel.grid.major = element_blank(), 
+#                        panel.grid.minor = element_blank(),
+#                        panel.background = element_blank(), 
+#                        legend.position = "top",
+#                        panel.border = element_blank(), 
+#                        strip.background = element_rect(fill = 'white', colour = 'white'))
+#   }
+#   
+#   # Select the data user selected
+#   plot_map = county_map[county_map$Indicator == indicator]
+#   
+#   # Add the data the user wants to see to the geographical world data
+#   county_map['Variable'] <- rep(data_type, nrow(world_data))
+#   county_map['Value'] <- plot_map$Value[match(county_map$County, plot_map$County)]
+#   
+#   
+#   # Specify the plot for the world map
+#   library(RColorBrewer)
+#   library(ggiraph)
+#   graph <- ggplot() + 
+#     geom_polygon_interactive(data = subset(world_data, lat >= -60 & lat <= 90), color = 'gray70', size = 0.1,
+#                              aes(x = long, y = lat, fill = Value, group = group, 
+#                                  tooltip = sprintf("%s<br/>%s", ISO3, Value))) + 
+#     scale_fill_gradientn(colours = brewer.pal(5, "RdBu"), na.value = 'white') + 
+#     labs(fill = data_type, color = data_type, title = NULL, x = NULL, y = NULL, caption = capt) + 
+#     my_theme()
+#   
+#   return(graph)
+# }
+
+ui = fluidPage(
+  #Title of the App
+  titlePanel("Countuy Health data"),
+  
+  sidebarPanel(
+    # GIve a brief instruction of the app
+    helpText("In this page, you can syncronausly visualize the value of at most four variables for every county"),
+    
+  #Which characteristics to display
+  selectInput(inputId="var_1",
+              label="Select the variables to display on a choropleth map",
+              choices = var_names,
+              selected = "Population"),
+  
+  selectInput(inputId="hist",
+              label="Select the variable to create a histogram",
+              choices = var_names2),
+  
+  #Regression explanatory variables
+  selectInput(inputId="explanatory",
+              label="Select the explanatory variable",
+              choices = var_names2),
+  
+  selectInput(inputId="independent",
+              label="Select the independent variable",
+              choices = var_names2),
+  ),
+
+  # varSelectInput(inputId="var_1",
+  #             label="Select the variables to create ",
+  #             data = health_data,
+  #             selected = "Population",
+  #             multiple = FALSE),
+  # ),
+  # 
+  #Map
+  mainPanel(
+    plotOutput("map_one",
+    click = "plot_click",
+    dblclick = "plot_dblclick",
+    hover = "plot_hover",
+    brush = "plot_brush"),
+    
+    plotOutput(
+      "hist"
+    ),
+    plotOutput("plot", 
+    click = "plot_click",
+    dblclick = "plot_dblclick",
+    hover = "plot_hover",
+    brush = "plot_brush"),
+    
+  
+    )
+        #leafletOutput("map", width="100%", height="100%"),)
+  
+  # Line chart: how the value has changed over the years
+  
+  # Regression 
+  
+)
+
+server <- function(input, output, session) {
+  selectedData <- reactive({
+    health_data_plot[, c(input$explanatory, input$independent)]
+  })
+  output$plot<-renderPlot({
+        plot(selectedData(),pch=16,col='blue',cex=2)
+    })
+  output$hist = renderPlot({
+    hist(county_map[, c(input$hist)], xlab="% of smokers", main="Histogram")
+  })
+  # output$map = renderLeaflet({
+  #   leaflet(county_map) %>% 
+  #   addTiles()  %>% 
+  #   setView( lat=40, lng=260 , zoom=4) %>%
+  #   addPolygons(data = shape, fillColor = "aliceblue", 
+  #                       color = "grey",
+  #                       layerId = ~COUNTYNS)
+  # })
+  #county_map$value = health_data[hef$DataType == data_type & df$Period == period,]
+  # output$map_one = renderPlot({
+  #   data = switch(input$var_1,
+  #                 "% Fair or Poor Health" = health_data[4],
+  #                 "Average Number of Physically Unhealthy Days" = health_data[5],
+  #                 "Average Number of Mentally Unhealthy Days" = health_data[6],
+  #                 "% Low Birthweight" = health_data[7],
+  #                 "% Smokers" = health_data[8],
+  #                 "% Adults with Obesity" = health_data[9],
+  #                 "Food Environment Index" = health_data[10],
+  #                 "% Physically Inactive"= health_data[11],
+  #                 "% With Access to Exercise Opportunities"= health_data[12],
+  #                 "% Excessive Drinking"= health_data[13],
+  #                 "Teen Birth Rate"= health_data[14],
+  #                 "Primary Care Physicians Ratio"= health_data[15],
+  #                 "Dentist Ratio"= health_data[16],
+  #                 "% Unemployed"= health_data[17],
+  #                 "Income Ratio"= health_data[18],
+  #                 "Social Association Rate"= health_data[19],
+  #                 "Violent Crime Rate"= health_data[20],
+  #                 "% Severe Housing Problems"= health_data[21],
+  #                 "% Drive Alone to Work"= health_data[22],
+  #                 "% Long Commute - Drives Alone"= health_data[23],
+  #                 "Life Expectancy"= health_data[24],
+  #                 "Age-Adjusted Death Rate"= health_data[25],
+  #                 "Child Mortality Rate"= health_data[26],
+  #                 "Infant Mortality Rate"= health_data[27],
+  #                 "% Food Insecure"= health_data[28],
+  #                 "% Limited Access to Healthy Foods"= health_data[29],
+  #                 "Drug Overdose Mortality Rate"= health_data[30],
+  #                 "% Insufficient Sleep"= health_data[31],
+  #                 "% Uninsured"= health_data[32],
+  #                 "Median Household Income"= health_data[33],
+  #                 "Suicide Rate (Age-Adjusted)"= health_data[34],
+  #                 "% Severe Housing Cost Burden"= health_data[35],
+  #                 "Population"= health_data[36],
+  #                 "Total area (square miles)"= health_data[37],
+  #                 "Population density"= health_data[38],
+  #                 "Mental Health Providor Rate"= health_data[39],
+  #                 )
+    # Function to visualize choloreth map
+  # selectedData_map <- reactive({
+  #   county_map[, c(input$var_1)]
+  # })
+  # data = reactive({switch(input$var_1,
+  #               "% Fair or Poor Health" = "% Fair or Poor Health",
+  #               "Average Number of Physically Unhealthy Days" = "Average Number of Physically Unhealthy Days",
+  #               "Average Number of Mentally Unhealthy Days" = "Average Number of Mentally Unhealthy Days",
+  #               "% Low Birthweight" = "% Low Birthweight",
+  #               "% Smokers" = "% Smokers",
+  #               "% Adults with Obesity" = "% Adults with Obesity",
+  #               "Food Environment Index" = "Food Environment Index",
+  #               "% Physically Inactive"= "% Physically Inactive",
+  #               "% With Access to Exercise Opportunities" = "% With Access to Exercise Opportunities",
+  #               "% Excessive Drinking"= "% Excessive Drinking",
+  #               "Teen Birth Rate"= "Teen Birth Rate",
+  #               "Primary Care Physicians Ratio"= "Primary Care Physicians Ratio",
+  #               "Dentist Ratio"= "Dentist Ratio",
+  #               "% Unemployed"= "% Unemployed",
+  #               "Income Ratio"= "Income Ratio",
+  #               "Social Association Rate"= "Social Association Rate",
+  #               "Violent Crime Rate"= "Violent Crime Rate",
+  #               "% Severe Housing Problems"= "% Severe Housing Problems",
+  #               "% Drive Alone to Work"= "% Drive Alone to Work",
+  #               "% Long Commute - Drives Alone"= "% Long Commute - Drives Alone",
+  #               "Life Expectancy"= "Life Expectancy",
+  #               "Age-Adjusted Death Rate"= "Age-Adjusted Death Rate",
+  #               "Child Mortality Rate"= "Child Mortality Rate",
+  #               "Infant Mortality Rate"= "Infant Mortality Rate",
+  #               "% Food Insecure"= "% Food Insecure",
+  #               "% Limited Access to Healthy Foods"= "% Limited Access to Healthy Foods",
+  #               "Drug Overdose Mortality Rate"= "Drug Overdose Mortality Rate",
+  #               "% Insufficient Sleep"= "% Insufficient Sleep",
+  #               "% Uninsured"= "% Uninsured",
+  #               "Median Household Income"= "Median Household Income",
+  #               "Suicide Rate (Age-Adjusted)"= "Suicide Rate (Age-Adjusted)",
+  #               "% Severe Housing Cost Burden"= "% Severe Housing Cost Burden",
+  #               "Population"= "Population",
+  #               "Total area (square miles)"= "Total area (square miles)",
+  #               "Population density"= "Population density",
+  #               "Mental Health Providor Rate"= "Mental Health Providor Rate",
+  #               )
+  # })
+ 
+  output$map_one = renderPlot(
+   ggplot() + geom_polygon(data=county_map, aes(x=long, y=lat, group=group, fill = county_map[, c(input$var_1)])) 
+ + labs(color = "% of somkers") + theme_void() + coord_map()
+  )
+    # map_one = switch (
+    #   input$var_1,
+    #   "% Fair or Poor Health" = ggplot() + geom_polygon(data=county_map, aes(x=long, y=lat, group=group, fill = )) + theme_void() + coord_map(),
+    #   "Average Number of Physically Unhealthy Days" = health_data[5],
+    #   "Average Number of Mentally Unhealthy Days" = health_data[6],
+    #   "% Low Birthweight" = health_data[7],
+    #   "% Smokers" = health_data[8],
+    #   "% Adults with Obesity" = health_data[9],
+    #   "Food Environment Index" = health_data[10],
+    #   "% Physically Inactive"= health_data[11],
+    #   "% With Access to Exercise Opportunities"= health_data[12],
+    #   "% Excessive Drinking"= health_data[13],
+    #   "Teen Birth Rate"= health_data[14],
+    #   "Primary Care Physicians Ratio"= health_data[15],
+    #   "Dentist Ratio"= health_data[16],
+    #   "% Unemployed"= health_data[17],
+    #   "Income Ratio"= health_data[18],
+    #   "Social Association Rate"= health_data[19],
+    #   "Violent Crime Rate"= health_data[20],
+    #   "% Severe Housing Problems"= health_data[21],
+    #   "% Drive Alone to Work"= health_data[22],
+    #   "% Long Commute - Drives Alone"= health_data[23],
+    #   "Life Expectancy"= health_data[24],
+    #   "Age-Adjusted Death Rate"= health_data[25],
+    #   "Child Mortality Rate"= health_data[26],
+    #   "Infant Mortality Rate"= health_data[27],
+    #   "% Food Insecure"= health_data[28],
+    #   "% Limited Access to Healthy Foods"= health_data[29],
+    #   "Drug Overdose Mortality Rate"= health_data[30],
+    #   "% Insufficient Sleep"= health_data[31],
+    #   "% Uninsured"= health_data[32],
+    #   "Median Household Income"= health_data[33],
+    #   "Suicide Rate (Age-Adjusted)"= health_data[34],
+    #   "% Severe Housing Cost Burden"= health_data[35],
+    #   "Population"= health_data[36],
+    #   "Total area (square miles)"= health_data[37],
+    #   "Population density"= health_data[38],
+    #   "Mental Health Providor Rate"= health_data[39]
+    # )
+    #  legend = switch(input$var_1,
+    #               "% Fair or Poor Health" = "% Fair or Poor Health",
+    #               "Average Number of Physically Unhealthy Days" = "Average Number of Physically Unhealthy Days",
+    #               "Average Number of Mentally Unhealthy Days" = "Average Number of Mentally Unhealthy Days",
+    #               "% Low Birthweight" = "% Low Birthweight",                         
+    #               "% Smokers" = "% Smokers",
+    #               "% Adults with Obesity" = "% Adults with Obesity",                      
+    #               "Food Environment Index" = "Food Environment Index",                  
+    #               "% Physically Inactive"= "% Physically Inactive",                      
+    #               "% With Access to Exercise Opportunities" = "% With Access to Exercise Opportunities",    
+    #               "% Excessive Drinking"= "% Excessive Drinking",                       
+    #               "Teen Birth Rate"= "Teen Birth Rate",   
+    #               "Primary Care Physicians Ratio"= "Primary Care Physicians Ratio",               
+    #               "Dentist Ratio"= "Dentist Ratio",                              
+    #               "% Unemployed"= "% Unemployed",                                
+    #               "Income Ratio"= "Income Ratio",                               
+    #               "Social Association Rate"= "Social Association Rate",                     
+    #               "Violent Crime Rate"= "Violent Crime Rate",                         
+    #               "% Severe Housing Problems"= "% Severe Housing Problems",                   
+    #               "% Drive Alone to Work"= "% Drive Alone to Work",                      
+    #               "% Long Commute - Drives Alone"= "% Long Commute - Drives Alone",               
+    #               "Life Expectancy"= "Life Expectancy",                            
+    #               "Age-Adjusted Death Rate"= "Age-Adjusted Death Rate",                     
+    #               "Child Mortality Rate"= "Child Mortality Rate",                       
+    #               "Infant Mortality Rate"= "Infant Mortality Rate",                       
+    #               "% Food Insecure"= "% Food Insecure",                            
+    #               "% Limited Access to Healthy Foods"= "% Limited Access to Healthy Foods",          
+    #               "Drug Overdose Mortality Rate"= "Drug Overdose Mortality Rate",               
+    #               "% Insufficient Sleep"= "% Insufficient Sleep",                        
+    #               "% Uninsured"= "% Uninsured",                                
+    #               "Median Household Income"= "Median Household Income",                     
+    #               "Suicide Rate (Age-Adjusted)"= "Suicide Rate (Age-Adjusted)",                
+    #               "% Severe Housing Cost Burden"= "% Severe Housing Cost Burden",                
+    #               "Population"= "Population",                                 
+    #               "Total area (square miles)"= "Total area (square miles)",                   
+    #               "Population density"= "Population density",                         
+    #               "Mental Health Providor Rate"= "Mental Health Providor Rate",      
+    #               )
+    # 
+    # percent_map(data, "blue", legend)
+  # })
+}
+# server = funtion(input, output) {
+#   output$map = renderPlot({
+#     args = switch(input$var_1,
+#                   )
+# 
+#     do.call(percent_map, args)
+#   })
+# }
+
+shinyApp(ui=ui, server=server) 
+
+```
+```{r}
+library(raster)
+library(sf)
+file_name <- system.file("~/Desktop/CS/Grinnell/boundary.shp", package="sf")
+shape <- tigris::counties(state = "VA", class = "sf")
+
+mypalette <- colorNumeric( palette="viridis", domain=health_data$Population, na.color="transparent")
+m <- leaflet(county_map) %>% 
+  addTiles()  %>% 
+  setView( lat=40, lng=260 , zoom=4) %>%
+  addPolygons(data = shape, fillColor = "aliceblue", 
+                        color = "grey",
+                        layerId = ~COUNTYNS)
+m
+```
+
+

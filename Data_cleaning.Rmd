@@ -27,8 +27,6 @@ View(Additional_measured_data)
 colnames(Additional_measured_data)
 data_keep2 = Additional_measured_data[, c(2, 3, 4, 23, 42, 61, 91, 93, 95, 132, 136, 158, 198, 246, 249)] 
 
-# View(data_keep)
-# View(data_keep2)
 #Combine the two data
 totalData <- merge(data_keep, data_keep2,by=c("State","County"))
 
@@ -64,6 +62,11 @@ colnames(totalData)
 
 finalData = select(totalData, -17, -18)
 
-write.csv(finalData, "CSC324_project_data.csv")
+colnames(finalData)
+#Change the name of variables
+colnames(finalData) [38] = "Population density"
+colnames(finalData) [39] = "Mental Health Providor Rate"
+
+write.csv(finalData, "~/Desktop/CS/CSC324_individual/CSC324_project_data.csv")
 ```
 
