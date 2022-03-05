@@ -112,7 +112,7 @@ ui = fluidPage(
               label="Select the independent variable",
               choices = var_names2),
   ),
-
+  sliderInput("num2", "Population", value = , min = 1000, max = 10000000),
   # varSelectInput(inputId="var_1",
   #             label="Select the variables to create ",
   #             data = health_data,
