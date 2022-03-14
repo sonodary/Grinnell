@@ -20,7 +20,7 @@ library(tools)
 
 #https://simplemaps.com/data/us-counties
 
-# Read the 
+# Read the file that holds health variables
 Health_Data = read_csv("~/Desktop/CS/Grinnell/CSC324_project_data.csv")
 
 # Read the file that holds the description of each variable
@@ -29,7 +29,6 @@ Data_description = read_csv("~/Desktop/CS/Grinnell/Variable Description.csv")
 # The first column is unnecessary
 health_data = dplyr::select(Health_Data, -1)
 
-health_data
 
 #Create the list of variable names to use for selectInput
 var_names = colnames(health_data)
@@ -268,6 +267,7 @@ server <- function(input, output, session) {
   output$plot = renderPlot({
           plot(selectedData(),pch=16,col='blue',cex=2)
   })
+}
   
 shinyApp(ui=ui, server=server) 
 
