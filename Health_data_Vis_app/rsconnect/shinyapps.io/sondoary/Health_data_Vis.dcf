@@ -1,0 +1,13 @@
+name: Health_data_Vis
+title: Health_data_Vis
+username:
+account: sondoary
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6033910
+bundleId: 5772647
+url: https://sondoary.shinyapps.io/Health_data_Vis/
+when: 1649297858.00359
+lastSyncTime: 1649297858.0036
+asMultiple: FALSE
+asStatic: FALSE
