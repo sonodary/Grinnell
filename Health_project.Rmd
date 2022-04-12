@@ -20,6 +20,8 @@ library(tools)
 
 #https://simplemaps.com/data/us-counties
 
+View(county_health_contiguous@data$State)
+
 # Read the file that holds health variables
 Health_Data = read_csv("~/Desktop/CS/Grinnell/CSC324_project_data.csv")
 

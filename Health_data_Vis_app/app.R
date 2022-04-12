@@ -64,7 +64,7 @@ ui = navbarPage(
     "Countuy Health data",
     
     # Set the theme
-    theme = shinythemes::shinytheme("slate"),
+    theme = shinythemes::shinytheme("cerulean"),
     
     # The first tab 
     tabPanel("Map", 
@@ -88,11 +88,18 @@ ui = navbarPage(
                      "hist"
                  ),
                  
-                 #Add marker to the specific country
+                 # Add marker to the specific country
                  selectizeInput(inputId="county_marker",
                                 choices = NULL,
                                 label = "Please select the county to display"
                  ),
+                 
+                 # If there are multiple county let user choose which state to display
+                 selectizeInput(inputId="county_state",
+                                choices = NULL,
+                                label = "Please select the state of the county"
+                 ),
+                 
                  # Let user choose the scale of the color
                  radioButtons(
                      inputId = "color_scale",
@@ -167,6 +174,12 @@ server <- function(input, output, session) {
                          server = TRUE)
     
     
+    # update selectinput for state of county marker
+    observe({
+            select_county = filter(county_health_contiguous@data, NAME %in% input$county_marker)
+            updateSelectizeInput(session, 'county_state', choices = select_county$State, server = TRUE)
+    })
+    
     # selectedData holds the explanatory variable and independent variable chosen by users
     selectedData = reactive({
         county_health_contiguous@data[, c(input$explanatory, input$independent)]
@@ -188,6 +201,9 @@ server <- function(input, output, session) {
         
         # The dataframe of the chosen county
         selected_county = subset(county_health_contiguous@data, county_health_contiguous@data$NAME == input$county_marker)
+        if (!is.null(input$county_state)) {
+            selected_county = subset(selected_county, selected_county$State == input$county_state)
+        }
         
         # Map object
         l = leaflet(county_health_contiguous) %>%
@@ -230,9 +246,14 @@ server <- function(input, output, session) {
         summary(county_health_contiguous$variable)
     })
     
+    
+    
     # The table of the chosen variable, state, and national average
     output$table_output = renderDataTable({
         choosen_county = subset(county_health_contiguous@data, county_health_contiguous@data$NAME == input$county_marker)
+        if (!is.null(input$county_state)) {
+            choosen_county = subset(choosen_county, choosen_county$State == input$county_state)
+        }
         choosen_county = choosen_county[-c(1:11)]
         if (nrow(choosen_county) == 1) {
             selected_state = subset(county_health_contiguous@data, county_health_contiguous@data$State == choosen_county$State)
@@ -243,26 +264,8 @@ server <- function(input, output, session) {
                 table = cbind(Measure = c(input$county_marker, choosen_county$State, "National avg"), table)
             }
         }
-        # In the future work, I am going to implment the function that distinguished the same name of the county
-        # else {
-        #   selected_states = rep(NA, nrow(choosen_county)) 
-        #   for (i in 1:nrow(choosen_county)) {
-        #     selected_states[i] = subset(county_health_contiguous@data, county_health_contiguous@data$State == choosen_county[i]$State)
-        #   }
-        #   mean_states = rep(rep(NA, length(mean_list)), nrow(choosen_county))
-        #   tables = 
-        # for (j in 1:nrow(choosen_county)) {
-        #   for (i in 1:length(mean_list)) {
-        #   mean_states[j][i] = mean(as.numeric(unlist(na.omit(selected_state[j][i + 12]))))
-        #   table = rbind(choosen_county[i][-c(1)], mean_state[j][i])
-        #   table = cbind(names = c(input$county_marker, choosen_county$State), table)
-        #   }
-        # }
-        #   table = rbind(table, mean_list)
-        #   table = cbind(names = c(rownames(table),  "National avg"), table)
-        #   }
         table
-    },options = list(scrollX = TRUE))
+    },options = list(dom = 't', scrollX = TRUE))
     # Distribution of the values
     output$hist = renderPlot({
         hist(county_health_contiguous@data[, c(input$map_var)], xlab=input$hist, main="Distribution")
